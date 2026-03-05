@@ -21,10 +21,13 @@ re_float = r'([-+]?\d+\.?\d*[ed]?[+-]?\d+|NaN)'
 # [Atoms] section (geo_info)
 regex_atoms = re.compile(r'\[atoms\]\s*\(?(angs|au)\)?', re.I)
 regex_atom = re.compile(r'\s*([a-z]+)\s+(\d+)\s+(\d+)\s+' + r'\s+'.join((re_float,)*3), re.I)
+regex_atom_molcas = re.compile(r'\s*([a-z]+)(\d+)\s+(\d+)\s+(\d+)\s+' + r'\s+'.join((re_float,)*3), re.I)
 
 # [GTO] section (ao_info)
 regex_basis = re.compile(r'\s*(\d+)\s+(\d+)$', re.I)
+regex_basis_molcas = re.compile(r'\s*(\d+)$', re.I)
 regex_contraction = re.compile(r'\s*([a-z]+)\s+(\d+)\s+(\d+(\.\d+)?)\s*($)', re.I)
+regex_contraction_molcas = re.compile(r'\s*([a-z]+)\s+(\d+)\s*($)', re.I)
 regex_primitive = re.compile(r'\s*'+r'\s+'.join((re_float,)*2), re.I)
 
 # flags for use of spherical/cartesian basis functions
@@ -152,10 +155,23 @@ def read_molden(fname, all_mo=False, spin=None, i_md=-1, interactive=True,
       angstrom = 'angs' == m.group(1).lower()
       continue
 
-    m = regex_atom.match(line)
+    m = regex_atom.match(line) 
     if m:
+      #print(m)
+      #print(list(m.groups()[:4]))
       qc.geo_info.append(list(m.groups()[:3]))
+      #print(qc.geo_info)
       qc.geo_spec.append([float(f) for f in m.groups()[3:]])
+      continue
+    m = regex_atom_molcas.match(line)
+    if m:
+      geolist = list(m.groups()[:4])
+      #print(geolist)
+      del geolist[1]
+      #print(geolist)
+      qc.geo_info.append(geolist)
+      #print(qc.geo_info)
+      qc.geo_spec.append([float(f) for f in m.groups()[4:]])
       continue
 
     # [GTO] section (ao_info)
@@ -163,7 +179,7 @@ def read_molden(fname, all_mo=False, spin=None, i_md=-1, interactive=True,
       # orbkit does not support Slater type orbitals
       raise IOError('orbkit does not work for STOs!\nEXIT\n')
 
-    m = regex_basis.match(line)
+    m = regex_basis.match(line) or regex_basis_molcas.match(line)
     if m:
       at_num = int(m.group(1)) - 1
       #ao_num = 0
@@ -181,7 +197,7 @@ def read_molden(fname, all_mo=False, spin=None, i_md=-1, interactive=True,
         if flag in FLAGS_CART:
           cartesian_basis.append(flag)
 
-    m = regex_contraction.match(line)
+    m = regex_contraction.match(line) or regex_contraction_molcas.match(line)
     if m:
       ao_num = 0               # Initialize number of atomic orbitals
       ao_type = m.group(1).lower()    # angular momentum
